@@ -13,7 +13,9 @@ const display = Instrument_Serif({
   variable: "--font-display",
   subsets: ["latin"],
   weight: "400",
-  style: ["normal", "italic"],
+  // `u-display` is only ever used italic — shipping the roman face too just
+  // adds a font file to the critical preload set.
+  style: ["italic"],
 });
 
 export const metadata: Metadata = {

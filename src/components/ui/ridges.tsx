@@ -1,6 +1,13 @@
 "use client";
 
-import { motion, useReducedMotion, useScroll, useSpring, useTransform } from "motion/react";
+import {
+  motion,
+  useReducedMotion,
+  useScroll,
+  useSpring,
+  useTransform,
+} from "motion/react";
+import type { CSSProperties } from "react";
 
 /**
  * Layered mountain backdrop.
@@ -162,7 +169,10 @@ export function Ridges() {
         style={{ background: "var(--sky)" }}
       />
 
-      <div className="absolute inset-0" style={{ opacity: "var(--ridge-strength)" }}>
+      <div
+        className="absolute inset-0"
+        style={{ opacity: "var(--ridge-strength)" }}
+      >
         {LAYERS.map((layer, i) => (
           <Ridge
             key={i}
@@ -178,7 +188,9 @@ export function Ridges() {
       {/* ground fade so the nearest ridge melts into the page */}
       <div
         className="absolute inset-x-0 bottom-0 h-[22vh]"
-        style={{ background: "linear-gradient(to bottom, transparent, var(--bg))" }}
+        style={{
+          background: "linear-gradient(to bottom, transparent, var(--bg))",
+        }}
       />
     </div>
   );
@@ -201,30 +213,40 @@ function Ridge({
   const id = `ridge-${index}`;
 
   return (
-    <motion.svg
-      className="absolute inset-x-[-10%] bottom-0 h-[54vh] w-[120%]"
-      viewBox={`0 0 ${VB_W} ${VB_H}`}
-      preserveAspectRatio="none"
-      style={still ? undefined : { y }}
-      animate={still ? undefined : { x: [0, spec.sway, 0] }}
-      transition={{ duration: spec.period, repeat: Infinity, ease: "easeInOut" }}
+    <div
+      className={`absolute inset-x-[-10%] bottom-0 h-[54vh] w-[120%]${still ? "" : " u-sway"}`}
+      style={
+        still
+          ? undefined
+          : ({
+              "--sway": `${spec.sway}px`,
+              "--period": `${spec.period}s`,
+            } as CSSProperties)
+      }
     >
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="0.35" y2="1">
-          <stop offset="0%" stopColor={spec.from} stopOpacity={0.95} />
-          <stop offset="55%" stopColor={spec.to} stopOpacity={0.45} />
-          <stop offset="100%" stopColor={spec.to} stopOpacity={0.08} />
-        </linearGradient>
-      </defs>
-      <path d={d} fill={`url(#${id})`} opacity={spec.opacity} />
-      <path
-        d={d}
-        fill="none"
-        stroke="var(--accent)"
-        strokeWidth={1}
-        vectorEffect="non-scaling-stroke"
-        opacity={spec.crest}
-      />
-    </motion.svg>
+      <motion.svg
+        className="size-full"
+        viewBox={`0 0 ${VB_W} ${VB_H}`}
+        preserveAspectRatio="none"
+        style={still ? undefined : { y }}
+      >
+        <defs>
+          <linearGradient id={id} x1="0" y1="0" x2="0.35" y2="1">
+            <stop offset="0%" stopColor={spec.from} stopOpacity={0.95} />
+            <stop offset="55%" stopColor={spec.to} stopOpacity={0.45} />
+            <stop offset="100%" stopColor={spec.to} stopOpacity={0.08} />
+          </linearGradient>
+        </defs>
+        <path d={d} fill={`url(#${id})`} opacity={spec.opacity} />
+        <path
+          d={d}
+          fill="none"
+          stroke="var(--accent)"
+          strokeWidth={1}
+          vectorEffect="non-scaling-stroke"
+          opacity={spec.crest}
+        />
+      </motion.svg>
+    </div>
   );
 }

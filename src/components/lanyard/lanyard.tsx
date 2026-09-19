@@ -1,13 +1,16 @@
 "use client";
 
-import { Canvas } from "@react-three/fiber";
+import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTheme } from "@/components/theme-provider";
 import { useMediaQuery } from "@/lib/use-media-query";
-import { LanyardScene } from "./scene";
+import { useSoftwareRenderer } from "@/lib/gpu";
 
 type Variant = "fixed" | "inline";
+
+/** three.js is ~0.9 MB — it never belongs in the first-load bundle. */
+const LanyardCanvas = dynamic(() => import("./canvas"), { ssr: false });
 
 /**
  * The hanging badge.
@@ -17,7 +20,8 @@ type Variant = "fixed" | "inline";
  *            badge is still there to play with instead of vanishing.
  *
  * The canvas never takes pointer events; the scene raycasts the window itself,
- * so nothing underneath becomes unclickable.
+ * so nothing underneath becomes unclickable. The shell reserves its own height,
+ * so the canvas arriving late shifts nothing.
  */
 export function Lanyard({ variant = "fixed" }: { variant?: Variant }) {
   const { theme, toggle } = useTheme();
@@ -26,14 +30,54 @@ export function Lanyard({ variant = "fixed" }: { variant?: Variant }) {
   const wide = useMediaQuery("(min-width: 1024px)");
   const reduced = useMediaQuery("(prefers-reduced-motion: reduce)");
 
+  const [shell, setShell] = useState<HTMLDivElement | null>(null);
+  const [near, setNear] = useState(false);
+  const [running, setRunning] = useState(true);
+  // Without a GPU every frame of this canvas is rasterised on the main thread.
+  // No amount of tuning (resolution, MSAA, frame rate) brings that under
+  // control, so those machines get the page without the badge — the same call
+  // `prefers-reduced-motion` already makes. The shell keeps its box either way,
+  // so nothing around it moves.
+  const soft = useSoftwareRenderer();
+
   const onArmed = useCallback((a: boolean) => setArmed(a), []);
   const onGrab = useCallback((g: boolean) => setGrabbing(g), []);
+
+  // Load — and afterwards draw — only while the badge is somewhere near the
+  // viewport, and never while the tab is in the background.
+  useEffect(() => {
+    const el = shell;
+    if (!el) return;
+
+    if (soft) return;
+
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        const visible = entry.isIntersecting;
+        setRunning(visible);
+        if (visible) setNear(true);
+      },
+      { rootMargin: "200px" },
+    );
+    io.observe(el);
+
+    const onVisibility = () => {
+      if (document.hidden) setRunning(false);
+      else setRunning(el.getBoundingClientRect().top < window.innerHeight + 200);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      io.disconnect();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [shell, soft]);
 
   if (reduced) return null;
   if (variant === "fixed" && !wide) return null;
   if (variant === "inline" && wide) return null;
 
-  const shell =
+  const shellClass =
     variant === "fixed"
       ? "pointer-events-none fixed top-0 right-0 z-40 h-screen"
       : "pointer-events-none relative z-10 mt-12 h-[min(62svh,460px)] w-full";
@@ -41,17 +85,24 @@ export function Lanyard({ variant = "fixed" }: { variant?: Variant }) {
   return (
     <div
       aria-hidden
-      className={shell}
+      ref={setShell}
+      className={shellClass}
       style={variant === "fixed" ? { width: "var(--badge-col)" } : undefined}
     >
-      <Canvas
-        dpr={[1, 2]}
-        gl={{ antialias: true, alpha: true }}
-        camera={{ position: [0, -0.3, 11.2], fov: 30 }}
-        style={{ pointerEvents: "none" }}
-      >
-        <LanyardScene theme={theme} onToggle={toggle} onArmed={onArmed} onGrab={onGrab} />
-      </Canvas>
+      {/* Holds the canvas's box whether or not it has loaded, so the caption
+          below never jumps when the chunk lands. */}
+      <div className="size-full">
+        {near && !soft && (
+          <LanyardCanvas
+            theme={theme}
+            wide={wide}
+            running={running}
+            onToggle={toggle}
+            onArmed={onArmed}
+            onGrab={onGrab}
+          />
+        )}
+      </div>
 
       <div
         className={
@@ -59,6 +110,7 @@ export function Lanyard({ variant = "fixed" }: { variant?: Variant }) {
             ? "absolute inset-x-0 bottom-8 flex justify-center px-6"
             : "mt-2 flex justify-center px-4"
         }
+        hidden={soft}
       >
         <AnimatePresence mode="wait" initial={false}>
           <motion.div

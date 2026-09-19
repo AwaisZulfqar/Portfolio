@@ -140,25 +140,63 @@ body {
   animation: u-pulse-ring 2.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
 }
 
-/* grain */
+/* grain — the box is only a hair larger than the viewport so the blended
+   layer stays roughly one screen of pixels; at inset:-50% it was four. */
 .u-grain {
   position: fixed;
-  inset: -50%;
+  inset: -6%;
   z-index: 60;
   pointer-events: none;
   opacity: 0.32;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  will-change: transform;
   animation: u-grain 0.7s steps(3) infinite;
 }
 @keyframes u-grain {
-  0%, 100% { transform: translate(0, 0); }
-  33% { transform: translate(-2%, 1%); }
-  66% { transform: translate(1%, -2%); }
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  33% { transform: translate3d(-2%, 1%, 0); }
+  66% { transform: translate3d(1%, -2%, 0); }
+}
+
+/* Above-the-fold entrance. Same curve and timings as the motion variants in
+   reveal.tsx, but driven by CSS so the hero paints and animates without
+   waiting for hydration — otherwise the largest text is invisible until the
+   bundle lands. */
+@keyframes u-rise {
+  from { opacity: 0; transform: translate3d(0, var(--rise, 26px), 0); }
+  to { opacity: 1; transform: none; }
+}
+.u-rise {
+  animation: u-rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes u-word {
+  from { transform: translate3d(0, 110%, 0); }
+  to { transform: none; }
+}
+.u-word {
+  display: inline-block;
+  animation: u-word 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--delay, 0s);
+}
+
+/* ridge sway — a compositor-only transform, so the scroll-driven `y` the
+   ridges also carry is the only thing React has to touch per frame. */
+@keyframes u-sway {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(var(--sway), 0, 0); }
+}
+.u-sway {
+  will-change: transform;
+  animation: u-sway var(--period) ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .u-marquee-track, .u-grain, .u-ping::after { animation: none !important; }
+  .u-marquee-track, .u-grain, .u-ping::after, .u-sway, .u-rise, .u-word {
+    animation: none !important;
+  }
   * { scroll-behavior: auto !important; }
 }
 

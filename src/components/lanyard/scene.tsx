@@ -10,6 +10,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { ANCHOR, CARD_H, CARD_W, CLIP_OFFSET, Lanyard, ROPE_COUNT } from "./physics";
 import { site } from "@/lib/site";
+import { setScrollLocked } from "@/lib/scroll-lock";
 import {
   makeBackTexture,
   makeFrontTexture,
@@ -162,9 +163,17 @@ export function LanyardScene({ theme, onToggle, onArmed, onGrab }: Props) {
       drag.current.depth = f.point.z;
       drag.current.target.copy(f.point);
       drag.current.armed = false;
-      document.body.style.cursor = "grabbing";
+      if (e.pointerType === "mouse") document.body.style.cursor = "grabbing";
       drag.current.pointerId = e.pointerId;
+      // Touch drags start life as a page scroll: hand the gesture to the badge
+      // by killing the native pan and parking the smooth-scroll driver.
+      setScrollLocked(true);
       onGrab(true);
+    };
+
+    // Non-passive, so the browser lets us veto the scroll the finger started.
+    const onTouchMove = (e: TouchEvent) => {
+      if (drag.current.active && e.cancelable) e.preventDefault();
     };
 
     const onMove = (e: PointerEvent) => {
@@ -191,8 +200,12 @@ export function LanyardScene({ theme, onToggle, onArmed, onGrab }: Props) {
         }
         return;
       }
+      // Hover feedback is a mouse-only affordance, and each check costs a
+      // raycast — never run it for the touch stream.
+      if (e.pointerType !== "mouse") return;
       const over = Boolean(faceHit(e));
-      document.body.style.cursor = over ? "grab" : "";
+      const want = over ? "grab" : "";
+      if (document.body.style.cursor !== want) document.body.style.cursor = want;
     };
 
     const onUp = () => {
@@ -201,6 +214,7 @@ export function LanyardScene({ theme, onToggle, onArmed, onGrab }: Props) {
       drag.current.active = false;
       sim.dampen(0.32);
       document.body.style.cursor = "";
+      setScrollLocked(false);
       onGrab(false);
       if (drag.current.armed) onToggle();
       drag.current.armed = false;
@@ -209,16 +223,19 @@ export function LanyardScene({ theme, onToggle, onArmed, onGrab }: Props) {
 
     window.addEventListener("pointerdown", onDown, { passive: false });
     window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
     window.addEventListener("blur", onUp);
     return () => {
       window.removeEventListener("pointerdown", onDown);
       window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
       window.removeEventListener("blur", onUp);
       document.body.style.cursor = "";
+      setScrollLocked(false);
     };
   }, [camera, gl, sim, viewport.width, onToggle, onArmed, onGrab]);
 

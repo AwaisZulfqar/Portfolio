@@ -2,12 +2,14 @@
 
 import { useEffect } from "react";
 import Lenis from "lenis";
+import { registerScroller } from "@/lib/scroll-lock";
 
 export function SmoothScroll() {
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     const lenis = new Lenis({ lerp: 0.1, wheelMultiplier: 1, touchMultiplier: 1.6 });
+    registerScroller(lenis);
     let raf = 0;
     const loop = (t: number) => {
       lenis.raf(t);
@@ -31,6 +33,7 @@ export function SmoothScroll() {
     return () => {
       document.removeEventListener("click", onAnchor);
       cancelAnimationFrame(raf);
+      registerScroller(null);
       lenis.destroy();
     };
   }, []);
